@@ -46,15 +46,15 @@ Bad:  "Tell me about notifications"
 
 ### Execution Time: 1-3 Minutes
 
-`gather_task_context` typically takes 1-3 minutes to return. **This is expected and normal.**
+`gather_task_context` typically takes 1-3+ minutes to return. **This is expected and normal.**
 
-The tool is doing work that would take your agent just as long or longer to do iteratively with native file-reading and grep — and it produces higher-quality context because it works from pre-computed, exhaustive documentation rather than raw source files.
+The tool is doing significant work that your agent would otherwise have to do on its own through many iterations of file reading, searching, and synthesis — consuming far more tokens and taking just as long or longer. It produces much higher-quality context because it leverages pre-computed, exhaustive guiding documentation that native tools don't have access to.
 
 Think of it as compressed expert-level codebase analysis. The wait is not wasted — it's the most efficient path to deep context.
 
 ### Deep Context Documents
 
-For cases where you need the full, unabridged codebase-wide documents (not synthesized excerpts), these are available directly:
+For cases where you want the full, unabridged codebase-wide documents, these are available directly:
 
 - **`get_architecture_overview`** — complete architecture document
 - **`get_llm_onboarding_guide`** — codebase orientation, navigation, conventions
@@ -114,7 +114,7 @@ analysis. It returns synthesized, task-specific context.
 Without explicit framing, models may interpret the 1-3 minute execution time as a failure signal and abandon the call. Include wait-time framing in your skill:
 
 ```markdown
-`gather_task_context` takes 1-3 minutes. This is expected. Wait for the full
+`gather_task_context` takes 1-3+ minutes. This is expected. Wait for the full
 response — it is doing work that would take you longer to do iteratively.
 ```
 
@@ -159,28 +159,28 @@ For each skill that involves codebase understanding:
 
 ### Scoring Your Skills
 
-| Score | Criteria |
-|-------|----------|
-| **8-10** | Names `gather_task_context` explicitly, explains what it does, includes wait-time framing and anti-substitution language |
-| **5-7** | Names Driver tools but missing framing or anti-substitution language |
-| **3-4** | Says "use Driver" without naming specific tools |
-| **1-2** | No Driver mention, or generic "gather context" language that causes native agent substitution |
+| Rating | Criteria |
+|--------|----------|
+| **Strong** | Names `gather_task_context` explicitly, explains what it does, includes wait-time framing and anti-substitution language |
+| **Partial** | Names Driver tools but missing framing or anti-substitution language |
+| **Weak** | Says "use Driver" without naming specific tools |
+| **Ineffective** | No Driver mention, or generic "gather context" language that causes native agent substitution |
 
 ### Before/After Examples
 
-**Before (score: 3/10):**
+**Before (weak):**
 ```markdown
 ## Research Phase
 Use Driver to understand the codebase architecture. Spawn a subagent
 to explore relevant code and gather context for the implementation.
 ```
 
-**After (score: 9/10):**
+**After (strong):**
 ```markdown
 ## Research Phase
 Call `gather_task_context` (Driver MCP) with a detailed task description
 and codebase names. This spawns a specialized context agent server-side
-and takes 1-3 minutes — wait for the full response. It returns synthesized,
+and takes 1-3+ minutes — wait for the full response. It returns synthesized,
 task-specific context that would take longer to gather manually.
 
 Do NOT use native Explore agents or subagents as a substitute for
