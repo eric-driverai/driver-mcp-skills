@@ -4,7 +4,7 @@ Exemplar skills and guidance for integrating [Driver MCP](https://driverai.com) 
 
 ## Driver MCP Usage
 
-Driver MCP provides codebase context through a hierarchy of tools. Use them correctly:
+Driver MCP provides dynamic codebase context through a hierarchy of tools. Use them correctly:
 
 ### Primary Tool: `gather_task_context`
 

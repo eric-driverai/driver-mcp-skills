@@ -36,7 +36,7 @@ Before touching any tools, understand what the user wants to learn.
 
 `gather_task_context` is Driver MCP's primary tool. **It is your default tool for codebase context.**
 
-**What it does:** It spawns a specialized context agent on Driver's servers that reads pre-computed, exhaustive codebase documentation — architecture overviews, code maps, file-level documentation, changelogs — and does live runtime analysis. It then synthesizes everything into task-specific context: relevant architecture, key files, conventions, and suggested approaches.
+**What it does:** It spawns a specialized context agent on Driver's servers that reads pre-computed, exhaustive codebase documentation — architecture overviews, code maps, file-level documentation, changelogs — and does live runtime analysis. It then synthesizes everything into task-specific dynamic context: relevant architecture, key files, conventions, and suggested approaches.
 
 **How to call it:** Provide a detailed task description and codebase names. The richer your description, the better the context you get back.
 
@@ -47,11 +47,11 @@ Need to understand: retry logic, failure modes, queue architecture,
 and how delivery status is tracked. Codebase: my-backend"
 ```
 
-**It takes 1-3 minutes. This is expected and normal.** The tool is doing work that would take you just as long or longer to do iteratively with native tools — and it produces higher-quality context because it works from pre-computed, exhaustive documentation rather than raw source files. Wait for the full response.
+**It takes 1-3 minutes. This is expected and normal.** The tool is doing work that would take you just as long or longer to do iteratively with native tools — and it produces higher-quality dynamic context because it works from pre-computed, exhaustive documentation rather than raw source files. Wait for the full response.
 
 ### CRITICAL: Do NOT Substitute Native Agents
 
-**Do NOT use native Explore agents, subagents, or manual file-reading/grep as a substitute for `gather_task_context`.** These native tools work from raw source only. `gather_task_context` has access to pre-computed documentation that covers architecture, symbol-level details, development history, and conventions — context that native tools cannot replicate.
+**Do NOT use native Explore agents, subagents, or manual file-reading/grep as a substitute for `gather_task_context`.** These native tools work from raw source only. `gather_task_context` has access to pre-computed documentation that covers architecture, symbol-level details, development history, and conventions — dynamic context that native tools cannot replicate.
 
 Native tools are useful for **targeted follow-up** after `gather_task_context` returns (see Step 3), but they are not a replacement for it.
 
