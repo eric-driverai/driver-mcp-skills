@@ -160,6 +160,84 @@ When the user indicates research is complete:
 
 ---
 
+## Using `driver-rp`
+
+`driver-rp` is a small CLI that creates and validates research and planning artifacts with structured frontmatter. **Use it to create every research and decision artifact** rather than hand-writing markdown files. The frontmatter is what makes the artifacts queryable and what powers the dry-run validation in the planning skill.
+
+If `driver-rp` is not installed, install it once: `uv tool install driver-rp` (or `uvx driver-rp <command>` for one-off invocations).
+
+### Scaffold a feature
+
+```
+driver-rp init <feature-name>
+```
+
+Creates `<feature-name>/` under the current directory with `FEATURE_LOG.md` and the standard subdirectory layout (`research/`, `plans/`, `implementation/`). Run this **once** at the start of a research session. Then `cd <feature-name>` so subsequent commands resolve the feature root automatically.
+
+### Create a research document
+
+```
+driver-rp add research "How session tokens are stored and rotated"
+```
+
+Creates the next numbered research file under `research/` (e.g. `research/01-how-session-tokens-are-stored-and-rotated.md`) with valid frontmatter and a stub heading. The filename is auto-numbered and slugified — do not pass a number or path. `00-` is reserved for the overview.
+
+Then edit the file body to capture findings as you go. The frontmatter (type, status, created, updated, topic) should not be removed.
+
+### Capture a decision inline with research
+
+When research surfaces a decision — a choice the work has made between alternatives — record it as a standalone decision artifact, not buried in a research doc:
+
+```
+driver-rp add decision "YAML library for round-trip-stable frontmatter writes"
+```
+
+Creates `research/decisions/dNN-yaml-library-for-round-trip-stable-frontmatter-writes.md` with `choice: "(fill in)"` and `rationale: "(fill in)"` placeholders. Open the file and replace both placeholders. **The decision file is the source of truth for the choice; cross-reference it from the research doc that motivated it, not the other way around.**
+
+This is the why-what-how methodology in artifact form: research docs capture *why* (the question + the investigation), decision artifacts capture *what* (the choice that was made and the rationale), and downstream plans reference the decision file by path.
+
+### Validate before declaring research complete
+
+```
+driver-rp validate
+```
+
+Walks every artifact under the feature root and checks that:
+- Frontmatter parses cleanly under the schema
+- Required fields are present
+- Round-trip is byte-stable (no silent drift)
+- Cross-references resolve
+
+Run this at the end of a research session and before handing off to planning. A clean `validate` exit is part of "research is done."
+
+### A typical research session
+
+```
+# 1. scaffold
+driver-rp init session-token-rotation
+cd session-token-rotation
+
+# 2. capture the question (00-overview is auto-created)
+driver-rp add research "Token storage mechanism survey"
+# ... edit research/01-token-storage-mechanism-survey.md as you investigate
+
+# 3. capture decisions as they crystallize
+driver-rp add decision "Use Argon2id for token derivation, not PBKDF2"
+# ... edit research/decisions/d01-... and replace the (fill in) placeholders
+
+# 4. validate before handoff
+driver-rp validate
+```
+
+### Anti-patterns specific to `driver-rp`
+
+- **Do NOT** hand-write research files without `driver-rp add research` — frontmatter typos cause silent validation failures later
+- **Do NOT** put decisions inside research docs as a "Decisions" section — make them standalone artifacts so plans can link to them
+- **Do NOT** edit the `type`, `created`, or auto-generated filename — these are part of the schema contract
+- **Do NOT** skip `driver-rp validate` at end-of-session — drift caught later costs more
+
+---
+
 ## Anti-Patterns
 
 **Do NOT:**
