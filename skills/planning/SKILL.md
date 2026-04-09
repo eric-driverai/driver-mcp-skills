@@ -334,6 +334,34 @@ Deletes every row from the verification cache. Use this when you've fixed the un
 
 The diagnostic ladder is: **`refs extract`** (is extraction correct?) → **`refs verify --no-cache`** (does the live MCP path agree?) → **`refs cache clear`** (was a stale cache hit hiding the truth?). Walk it in order.
 
+### Dry-run loop commands
+
+These `plan` subcommands drive the dry-run loop described in the next section. They ship in `driver-rp >= 0.2.0`.
+
+```
+driver-rp plan validate <plan-name> [--json]
+```
+
+Runs mechanical checks (schema, dependency graph, code-reference verification via Driver MCP) against the plan and its tasks. Returns a `GapEnvelope` JSON body (with `--json`) containing all gaps the CLI can find without reading prose. This is the **mechanical pass** of the dry-run loop.
+
+```
+driver-rp plan critique record <plan-name> --iteration N --gaps <json-file> [--overwrite] [--overwrite-reason "..."]
+```
+
+Merges the agent's judgment gaps with the mechanical gaps, stamps `gap_id`s, deduplicates against prior iterations, and writes `dry-runs/<plan-name>/iteration-NN.md`. Exit codes: `0` (converged), `1` (continue), `2` (error), `3` (HIGH gap, policy says stop), `4` (iteration cap exceeded). Pass `--overwrite` to replace an existing iteration report (requires `--overwrite-reason`).
+
+```
+driver-rp plan mark-dry-run-clean <plan-name>
+```
+
+Sets the plan's frontmatter status to `dry_run_clean`. Call this **only** after the dry-run loop converges (exit code `0` from `plan critique record`). The plan is now ready for implementation.
+
+```
+driver-rp plan policy <plan-name>
+```
+
+Prints the effective `DryRunPolicy` for the plan (iteration cap, severity actions). Reads from plan frontmatter `dry_run_policy` field, falling back to defaults (`low: auto`, `medium: confirm`, `high: stop`, `iteration_cap: 5`). Useful for confirming policy before starting a dry-run loop.
+
 ### A typical planning session
 
 ```
@@ -406,6 +434,7 @@ loop:
   exit_code = run(f"driver-rp plan critique record <name> --iteration {ITERATION} --gaps merged.json")
 
   if exit_code == 0:   # converged: no new gaps this iteration
+      run("driver-rp plan mark-dry-run-clean <name>")
       break
   if exit_code == 3:   # HIGH-severity gap encountered, stopping per policy
       stop_and_present_to_user()
@@ -426,10 +455,11 @@ The loop is intentionally a few lines of prose because:
 
 | Exit | Meaning | What the agent does |
 |------|---------|---------------------|
-| `0` | Converged — no new gaps merged in this iteration | Stop. Plan is dry-run-clean. |
+| `0` | Converged — no new gaps merged in this iteration | Stop. Call `driver-rp plan mark-dry-run-clean <name>`. Plan is dry-run-clean. |
 | `1` | New gaps were merged — keep iterating | Fix the gaps in the plan/task files, increment iteration, loop |
+| `2` | Internal error (bad JSON, missing iteration file, etc.) | Stop and diagnose — do not retry blindly |
 | `3` | A HIGH-severity gap was recorded and the policy says to stop on HIGH | Stop and present to the user; do not auto-fix HIGH gaps |
-| `4` | Iteration cap reached (default 5) without convergence | Stop and present to the user; the plan likely needs restructuring, not more iteration |
+| `4` | Iteration cap reached (per `DryRunPolicy.iteration_cap`, default 5) without convergence | Stop and present to the user; the plan likely needs restructuring, not more iteration |
 
 Treat any exit code other than `0` as a stop point unless your loop pseudocode explicitly handles it. **`1` is the only "continue" code.** Everything else means a human (or the user) needs to look.
 
@@ -442,18 +472,20 @@ Iterations are **1-indexed**. The first run is `--iteration 1`. The CLI rejects 
 A full breakdown is in the next two sections. The summary:
 
 - **Convergence:** zero new gaps merged in an iteration → stop. `gap_id` is stable across iterations, so a gap that was already present in iteration N - 1 is not "new" in N.
-- **Cap:** 5 iterations max, configurable per plan via `dry_run_policy`. After the cap the plan needs human attention.
+- **Cap:** `DryRunPolicy.iteration_cap` iterations max (default 5, configurable per plan via `dry_run_policy`). After the cap the plan needs human attention. Query the effective policy with `driver-rp plan policy <name>`.
 - **Severity policy:** by default, HIGH-severity gaps halt the loop. The policy is configurable per plan via the `dry_run_policy` field on the plan frontmatter.
 
 ### Pre-Plan-05 transition note
 
-The `driver-rp plan validate` and `driver-rp plan critique record` commands are added in Plan 05 of the `research-planning-as-a-product` feature. **Until that ships in `driver-rp ≥ 0.2.0`**, agents drive the loop manually:
+The `driver-rp plan validate`, `driver-rp plan critique record`, `driver-rp plan mark-dry-run-clean`, and `driver-rp plan policy` commands shipped in Plan 05 of the `research-planning-as-a-product` feature (`driver-rp >= 0.2.0`). **Use these commands for all dry-run loops.**
 
-- Use the flat `driver-rp validate` (or `driver-rp validate --plan <name>`) for the mechanical pass — it returns the same `GapEnvelope` shape
-- Run the critic prompt by hand against the plan body and write the merged gap list into `dry-runs/<name>/iteration-NN.md` directly
-- The merge logic, `gap_id` stamping, and convergence check have to be done by the agent in prose
+For `driver-rp < 0.2.0` (v0.1.0 window), agents drove the loop manually:
 
-This is friction worth tolerating in the v0.1.0 window because the loop is small. Once `plan validate` / `plan critique record` ship, switch to the CLI-stamped flow — the manual flow is identical in semantics but error-prone in `gap_id` deduplication.
+- Used the flat `driver-rp validate` (or `driver-rp validate --plan <name>`) for the mechanical pass — it returns the same `GapEnvelope` shape
+- Ran the critic prompt by hand against the plan body and wrote the merged gap list into `dry-runs/<name>/iteration-NN.md` directly
+- The merge logic, `gap_id` stamping, and convergence check were done by the agent in prose
+
+The manual flow is identical in semantics but error-prone in `gap_id` deduplication. Prefer the CLI-stamped flow.
 
 ---
 
@@ -611,7 +643,7 @@ When `dry_run_policy` is unset in frontmatter, apply the default (low: auto, med
 
 STOPPING CRITERIA (short)
 
-- iteration >= 5: stop, regardless of whether converged
+- iteration >= DryRunPolicy.iteration_cap (default 5): stop, regardless of whether converged
 - gaps == []: set converged: true; loop exits
 - any HIGH gap and policy says stop: loop exits
 - otherwise: continue, fix gaps, increment iteration
@@ -647,7 +679,7 @@ The dry-run loop has three orthogonal stop conditions. The loop driver (the agen
 
 After `driver-rp plan critique record` writes iteration N, exit code `0` means **no new gaps were merged in iteration N relative to iteration N-1**. Same gap_id appearing again is not new. Same `(kind, location.section)` mapping to a re-keyed gap_id is also not new — `gap_id` is deterministic from those fields.
 
-When `0` is returned: stop, mark the plan `dry_run_clean` in frontmatter (`status: dry_run_clean`), and proceed to implementation.
+When `0` is returned: stop, run `driver-rp plan mark-dry-run-clean <name>` to set frontmatter `status: dry_run_clean`, and proceed to implementation.
 
 **Important:** convergence is "no NEW gaps," not "zero gaps." A plan can converge with a non-empty open-gap list — those remaining gaps are ones the planner has chosen to defer (`status: deferred`) or won't fix (`status: wont_fix`). The loop respects those decisions and does not flag them as un-converged.
 
